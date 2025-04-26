@@ -80,15 +80,15 @@ def train(model_name, params):
 
     if model_name == backend.models[0]:
         # Start training course similarity model
-        with st.spinner('Training...'):
+        with st.spinner('Training Course Similarity Model...'):
             time.sleep(0.5)
-            backend.train(model_name)
-        st.success('Done!')
+            backend.train(model_name, params)
+        st.success('Course Similarity Model trained successfully!')
     # TODO: Add other model training code here
     elif model_name == backend.models[1]:
         pass
     else:
-        pass
+        st.warning('Training logic for this model is not implemented yet.')
 
 
 def predict(model_name, user_ids, params):

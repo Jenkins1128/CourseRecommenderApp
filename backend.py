@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 
 models = ("Course Similarity",
           "User Profile",
@@ -80,7 +82,35 @@ def course_similarity_recommendations(idx_id_dict, id_idx_dict, enrolled_course_
 # Model training
 def train(model_name, params):
     # TODO: Add model training code here
-    pass
+    print('params:', params)
+
+    if model_name == models[0]:
+        # Load the Bag of Words (BoW) dataset
+        bow_df = load_bow()
+
+        # Create a similarity matrix
+        bow_matrix_np = bow_df.pivot(index='doc_index', columns='token', values='bow').fillna(0).to_numpy()
+        sim_matrix = cosine_similarity(bow_matrix_np)
+
+        # Apply similarity threshold
+        sim_threshold = params.get('sim_threshold', 50) / 100.0  # Default to 50% if not provided
+        sim_matrix[sim_matrix < sim_threshold] = 0
+
+        # Optionally, limit the number of top courses
+        # top_courses = params.get('top_courses', 10)  # Default to 10 if not provided
+        # if top_courses > 0:
+        #     for i in range(sim_matrix.shape[0]):
+        #         # Get indices of top N similarities for each course
+        #         top_indices = sim_matrix[i].argsort()[-top_courses:][::-1]
+        #         mask = np.ones(sim_matrix.shape[1], dtype=bool)
+        #         mask[top_indices] = False
+        #         sim_matrix[i][mask] = 0
+
+        # Save the filtered similarity matrix
+        filtered_sim_df = pd.DataFrame(sim_matrix)
+        filtered_sim_df.to_csv("data/sim.csv", index=False)
+
+
 
 
 # Prediction
