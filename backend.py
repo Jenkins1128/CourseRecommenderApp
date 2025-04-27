@@ -96,15 +96,15 @@ def train(model_name, params):
         sim_threshold = params.get('sim_threshold', 50) / 100.0  # Default to 50% if not provided
         sim_matrix[sim_matrix < sim_threshold] = 0
 
-        # Optionally, limit the number of top courses
-        # top_courses = params.get('top_courses', 10)  # Default to 10 if not provided
-        # if top_courses > 0:
-        #     for i in range(sim_matrix.shape[0]):
-        #         # Get indices of top N similarities for each course
-        #         top_indices = sim_matrix[i].argsort()[-top_courses:][::-1]
-        #         mask = np.ones(sim_matrix.shape[1], dtype=bool)
-        #         mask[top_indices] = False
-        #         sim_matrix[i][mask] = 0
+        # Limit the number of top courses
+        top_courses = params.get('top_courses', 10)  # Default to 10 if not provided
+        if top_courses > 0:
+            for i in range(sim_matrix.shape[0]):
+                # Get indices of top N similarities for each course
+                top_indices = sim_matrix[i].argsort()[-top_courses:][::-1]
+                mask = np.ones(sim_matrix.shape[1], dtype=bool)
+                mask[top_indices] = False
+                sim_matrix[i][mask] = 0
 
         # Save the filtered similarity matrix
         filtered_sim_df = pd.DataFrame(sim_matrix)
