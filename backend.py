@@ -84,7 +84,7 @@ def train(model_name, params):
     # TODO: Add model training code here
     print('params:', params)
 
-    if model_name == models[0]:
+    if model_name == models[0]: #Course Similarity
         # Load the Bag of Words (BoW) dataset
         bow_df = load_bow()
 
@@ -95,16 +95,6 @@ def train(model_name, params):
         # Apply similarity threshold
         sim_threshold = params.get('sim_threshold', 50) / 100.0  # Default to 50% if not provided
         sim_matrix[sim_matrix < sim_threshold] = 0
-
-        # Limit the number of top courses
-        top_courses = params.get('top_courses', 10)  # Default to 10 if not provided
-        if top_courses > 0:
-            for i in range(sim_matrix.shape[0]):
-                # Get indices of top N similarities for each course
-                top_indices = sim_matrix[i].argsort()[-top_courses:][::-1]
-                mask = np.ones(sim_matrix.shape[1], dtype=bool)
-                mask[top_indices] = False
-                sim_matrix[i][mask] = 0
 
         # Save the filtered similarity matrix
         filtered_sim_df = pd.DataFrame(sim_matrix)
@@ -139,8 +129,9 @@ def predict(model_name, user_ids, params):
                     scores.append(score)
         # TODO: Add prediction model code here
 
-    res_dict['USER'] = users
-    res_dict['COURSE_ID'] = courses
-    res_dict['SCORE'] = scores
+
+    res_dict['USER'] = users[:params['top_courses']] if 'top_courses' in params else users
+    res_dict['COURSE_ID'] = courses[:params['top_courses']] if 'top_courses' in params else courses
+    res_dict['SCORE'] = scores[:params['top_courses']] if 'top_courses' in params else scores
     res_df = pd.DataFrame(res_dict, columns=['USER', 'COURSE_ID', 'SCORE'])
     return res_df
