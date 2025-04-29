@@ -86,7 +86,10 @@ def train(model_name, params):
         st.success('Course Similarity Model trained successfully!')
     # TODO: Add other model training code here
     elif model_name == backend.models[1]:
-        pass
+        with st.spinner('Training User Profile Model...'):
+            time.sleep(0.5)
+            backend.train(model_name, params)
+        st.success('User Profile Model trained successfully!')
     else:
         st.warning('Training logic for this model is not implemented yet.')
 
@@ -132,9 +135,15 @@ if model_selection == backend.models[0]:
 # TODO: Add hyper-parameters for other models
 # User profile model
 elif model_selection == backend.models[1]:
+    # Add a slide bar for selecting top courses
+    top_courses = st.sidebar.slider('Top courses',
+                                    min_value=0, max_value=100,
+                                    value=10, step=1)
     profile_sim_threshold = st.sidebar.slider('User Profile Similarity Threshold %',
                                               min_value=0, max_value=100,
                                               value=50, step=10)
+    params['top_courses'] = top_courses
+    params['sim_threshold'] = profile_sim_threshold
 # Clustering model
 elif model_selection == backend.models[2]:
     cluster_no = st.sidebar.slider('Number of Clusters',
