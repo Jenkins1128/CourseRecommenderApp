@@ -83,7 +83,7 @@ def course_similarity_recommendations(idx_id_dict, id_idx_dict, enrolled_course_
 
 
 # Model training
-def train(model_name, params):
+def train(model_name, test_user_ids, params):
     # TODO: Add model training code here
     print('params:', params)
 
@@ -107,19 +107,18 @@ def train(model_name, params):
         ratings_df = pd.read_csv('data/ratings.csv')
         # Load course genres data
         course_genres_df = pd.read_csv('data/course_genres.csv')
-        # Get unique users
-        unique_users = ratings_df['user'].unique()
-        # Create empty dataframe for user profiles
+
         profiles = []
-        # For each user
-        for user_id in unique_users:
+
+        # For test user ids
+        for test_user_id in test_user_ids:
             # Get user's rated courses
-            user_ratings = ratings_df[ratings_df['user'] == user_id]
+            user_ratings = ratings_df[ratings_df['user'] == test_user_id]
             # Get course genres for rated courses
-            user_course_genres = course_genres_df[course_genres_df['COURSE_ID'].isin(user_ratings['item'])]
+            # user_course_genres = course_genres_df[course_genres_df['COURSE_ID'].isin(user_ratings['item'])]
             # Calculate weighted genre scores based on ratings
             profile = pd.DataFrame()
-            profile['user'] = [user_id]
+            profile['user'] = [test_user_id]
             # Calculate genre scores by multiplying ratings with course genres
             for genre in course_genres_df.columns[2:]:
                 genre_scores = []
@@ -130,18 +129,21 @@ def train(model_name, params):
                     genre_scores.append(rating * course_genre)
                 profile[genre] = [sum(genre_scores)]
             profiles.append(profile)
-
+        print('profiles:', profiles)
         # Combine all user profiles
-        profile_df = pd.concat(profiles, ignore_index=True)
+        test_user_profile_df = pd.concat(profiles, ignore_index=True)
         # Save user profiles
-        profile_df.to_csv('data/profile_genres.csv', index=False)
+        test_user_profile_df.to_csv('data/test_user_profile.csv', index=False)
 
 
 # Prediction
-def predict(model_name, user_ids, params):
+def predict(model_name, test_user_ids, params):
     sim_threshold = 0.6
+    score_threshold = 2
     if "sim_threshold" in params:
         sim_threshold = params["sim_threshold"] / 100.0
+    if 'score_threshold' in params:
+        score_threshold = params['score_threshold']
     idx_id_dict, id_idx_dict = get_doc_dicts()
     sim_matrix = load_course_sims().to_numpy()
     users = []
@@ -149,16 +151,16 @@ def predict(model_name, user_ids, params):
     scores = []
     res_dict = {}
 
-    for user_id in user_ids:
+    for test_user_id in test_user_ids:
         # Course Similarity model
         if model_name == models[0]:
             ratings_df = load_ratings()
-            user_ratings = ratings_df[ratings_df['user'] == user_id]
+            user_ratings = ratings_df[ratings_df['user'] == test_user_id]
             enrolled_course_ids = user_ratings['item'].to_list()
             res = course_similarity_recommendations(idx_id_dict, id_idx_dict, enrolled_course_ids, sim_matrix)
             for key, score in res.items():
                 if score >= sim_threshold:
-                    users.append(user_id)
+                    users.append(test_user_id)
                     courses.append(key)
                     scores.append(score)
         # User Profile model prediction
@@ -166,16 +168,16 @@ def predict(model_name, user_ids, params):
             # Load necessary data
             ratings_df = load_ratings()
             course_genres_df = pd.read_csv('data/course_genres.csv')
-            profile_df = pd.read_csv('data/profile_genres.csv')
+            profile_df = pd.read_csv('data/test_user_profile.csv')
 
             # Get user profile
-            user_profile = profile_df[profile_df['user'] == user_id]
+            user_profile = profile_df[profile_df['user'] == test_user_id]
             if not user_profile.empty:
                 # Get user vector (excluding user ID column)
                 user_vector = user_profile.iloc[0, 1:].values
 
                 # Get enrolled courses for the user
-                user_ratings = ratings_df[ratings_df['user'] == user_id]
+                user_ratings = ratings_df[ratings_df['user'] == test_user_id]
                 enrolled_courses = user_ratings['item'].to_list()
 
                 # Get all courses and find unknown courses
@@ -192,13 +194,13 @@ def predict(model_name, user_ids, params):
                 # Add recommendations above threshold
                 for i in range(len(unknown_course_ids)):
                     score = recommendation_scores[i]
-                    print(f'score: {score}, sim_threshold: {sim_threshold}')
-                    if score >= sim_threshold:
-                        users.append(user_id)
+                    print(f'score: {score}, score: {score_threshold}')
+                    if score >= score_threshold:
+                        users.append(test_user_id)
                         courses.append(unknown_course_ids[i])
                         scores.append(score)
             else:
-                print(f'User {user_id} has no profile data.')
+                print(f'User {test_user_id} has no profile data.')
 
     res_dict['USER'] = users[:params['top_courses']] if 'top_courses' in params else users
     res_dict['COURSE_ID'] = courses[:params['top_courses']] if 'top_courses' in params else courses

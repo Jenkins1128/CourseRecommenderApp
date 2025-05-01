@@ -76,30 +76,30 @@ def init__recommender_app():
     return results
 
 
-def train(model_name, params):
+def train(model_name, test_user_ids, params):
 
     if model_name == backend.models[0]:
         # Start training course similarity model
         with st.spinner('Training Course Similarity Model...'):
             time.sleep(0.5)
-            backend.train(model_name, params)
+            backend.train(model_name, test_user_ids, params)
         st.success('Course Similarity Model trained successfully!')
     # TODO: Add other model training code here
     elif model_name == backend.models[1]:
         with st.spinner('Training User Profile Model...'):
             time.sleep(0.5)
-            backend.train(model_name, params)
+            backend.train(model_name, test_user_ids, params)
         st.success('User Profile Model trained successfully!')
     else:
         st.warning('Training logic for this model is not implemented yet.')
 
 
-def predict(model_name, user_ids, params):
+def predict(model_name, test_user_ids, params):
     res = None
     # Start making predictions based on model name, test user ids, and parameters
     with st.spinner('Generating course recommendations: '):
         time.sleep(0.5)
-        res = backend.predict(model_name, user_ids, params)
+        res = backend.predict(model_name, test_user_ids, params)
     st.success('Recommendations generated!')
     return res
 
@@ -139,11 +139,11 @@ elif model_selection == backend.models[1]:
     top_courses = st.sidebar.slider('Top courses',
                                     min_value=0, max_value=100,
                                     value=10, step=1)
-    profile_sim_threshold = st.sidebar.slider('User Profile Similarity Threshold %',
+    profile_score_threshold = st.sidebar.slider('User Profile Similarity Threshold %',
                                               min_value=0, max_value=100,
-                                              value=50, step=10)
+                                              value=50, step=2)
     params['top_courses'] = top_courses
-    params['sim_threshold'] = profile_sim_threshold
+    params['score_threshold'] = profile_score_threshold
 # Clustering model
 elif model_selection == backend.models[2]:
     cluster_no = st.sidebar.slider('Number of Clusters',
@@ -159,7 +159,9 @@ training_button = st.sidebar.button("Train Model")
 training_text = st.sidebar.text('')
 # Start training process
 if training_button:
-    train(model_selection, params)
+    new_id = backend.add_new_ratings(selected_courses_df['COURSE_ID'].values)
+    user_ids = [new_id]
+    train(model_selection, user_ids, params)
 
 
 # Prediction
@@ -168,8 +170,7 @@ st.sidebar.subheader('4. Prediction')
 pred_button = st.sidebar.button("Recommend New Courses")
 if pred_button and selected_courses_df.shape[0] > 0:
     # Create a new id for current user session
-    new_id = backend.add_new_ratings(selected_courses_df['COURSE_ID'].values)
-    user_ids = [new_id]
+    user_ids = [backend.load_ratings()['user'].max()]
     res_df = predict(model_selection, user_ids, params)
     res_df = res_df[['COURSE_ID', 'SCORE']]
     course_df = load_courses()
