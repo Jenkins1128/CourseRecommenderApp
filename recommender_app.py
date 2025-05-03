@@ -154,7 +154,11 @@ elif model_selection == backend.models[2]:
     cluster_no = st.sidebar.slider('Number of Clusters',
                                    min_value=0, max_value=50,
                                    value=10, step=1)
+    enrollments_threshold = st.sidebar.slider('User Enrollments Threshold',
+                                              min_value=0, max_value=100,
+                                              value=10, step=2)
     params['cluster_no'] = cluster_no
+    params['enrollments_threshold'] = enrollments_threshold
 else:
     pass
 
