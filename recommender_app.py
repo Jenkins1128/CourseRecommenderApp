@@ -76,30 +76,35 @@ def init__recommender_app():
     return results
 
 
-def train(model_name, test_user_ids, params):
+def train(model_name, test_user_id, params):
 
     if model_name == backend.models[0]:
         # Start training course similarity model
         with st.spinner('Training Course Similarity Model...'):
             time.sleep(0.5)
-            backend.train(model_name, test_user_ids, params)
+            backend.train(model_name, test_user_id, params)
         st.success('Course Similarity Model trained successfully!')
     # TODO: Add other model training code here
     elif model_name == backend.models[1]:
         with st.spinner('Training User Profile Model...'):
             time.sleep(0.5)
-            backend.train(model_name, test_user_ids, params)
+            backend.train(model_name, test_user_id, params)
         st.success('User Profile Model trained successfully!')
+    elif model_name == backend.models[2]:
+        with st.spinner('Training Clustering Model...'):
+            time.sleep(0.5)
+            backend.train(model_name, test_user_id, params)
+        st.success('Clustering Model trained successfully!')
     else:
         st.warning('Training logic for this model is not implemented yet.')
 
 
-def predict(model_name, test_user_ids, params):
+def predict(model_name, test_user_id, params):
     res = None
     # Start making predictions based on model name, test user ids, and parameters
     with st.spinner('Generating course recommendations: '):
         time.sleep(0.5)
-        res = backend.predict(model_name, test_user_ids, params)
+        res = backend.predict(model_name, test_user_id, params)
     st.success('Recommendations generated!')
     return res
 
@@ -148,7 +153,8 @@ elif model_selection == backend.models[1]:
 elif model_selection == backend.models[2]:
     cluster_no = st.sidebar.slider('Number of Clusters',
                                    min_value=0, max_value=50,
-                                   value=20, step=1)
+                                   value=10, step=1)
+    params['cluster_no'] = cluster_no
 else:
     pass
 
@@ -159,9 +165,8 @@ training_button = st.sidebar.button("Train Model")
 training_text = st.sidebar.text('')
 # Start training process
 if training_button:
-    new_id = backend.add_new_ratings(selected_courses_df['COURSE_ID'].values)
-    user_ids = [new_id]
-    train(model_selection, user_ids, params)
+    new_test_user_id = backend.add_new_ratings(selected_courses_df['COURSE_ID'].values)
+    train(model_selection, new_test_user_id, params)
 
 
 # Prediction
@@ -170,8 +175,8 @@ st.sidebar.subheader('4. Prediction')
 pred_button = st.sidebar.button("Recommend New Courses")
 if pred_button and selected_courses_df.shape[0] > 0:
     # Create a new id for current user session
-    user_ids = [backend.load_ratings()['user'].max()]
-    res_df = predict(model_selection, user_ids, params)
+    test_user_id = backend.load_ratings()['user'].max()
+    res_df = predict(model_selection, test_user_id, params)
     res_df = res_df[['COURSE_ID', 'SCORE']]
     course_df = load_courses()
     res_df = pd.merge(res_df, course_df, on=["COURSE_ID"]).drop('COURSE_ID', axis=1)
