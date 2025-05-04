@@ -100,6 +100,12 @@ def train(model_name, test_user_id, params):
             time.sleep(0.5)
             backend.train(model_name, test_user_id, params)
         st.success('Clustering Model with PCA trained successfully!')
+    elif model_name == backend.models[4]:
+        with st.spinner('Training KNN Model...'):
+            time.sleep(0.5)
+            backend.train(model_name, test_user_id, params)
+        st.success('KNN Model trained successfully!')
+
     else:
         st.warning('Training logic for this model is not implemented yet.')
 
@@ -174,6 +180,19 @@ elif model_selection == backend.models[3]:
                                               value=10, step=2)
     params['cluster_no'] = cluster_no
     params['enrollments_threshold'] = enrollments_threshold
+# KNN model
+elif model_selection == backend.models[4]:
+    # Add a slide bar for selecting top courses
+    top_courses = st.sidebar.slider('Top courses',
+                                    min_value=0, max_value=100,
+                                    value=10, step=1)
+    knn_score_threshold = st.sidebar.slider('KNN Rating Mode Threshold',
+                                            min_value=0, max_value=3,
+                                            value=2, step=1)
+    params['top_courses'] = top_courses
+    params['knn_score_threshold'] = knn_score_threshold
+elif model_selection == backend.models[5]:
+    pass
 else:
     pass
 

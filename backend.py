@@ -5,6 +5,11 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 
+from surprise import KNNBasic
+from surprise import Dataset, Reader
+from surprise.model_selection import train_test_split
+from surprise import accuracy
+
 models = ("Course Similarity",
           "User Profile",
           "Clustering",
@@ -237,6 +242,30 @@ def train(model_name, test_user_id, params):
         combined_df = combine_cluster_labels(user_ids, cluster_labels)
         # Save the cluster labels to a CSV file
         combined_df.to_csv('data/user_clusters.csv', index=False)
+    elif model_name == models[4]: # KNN
+        # Read the course rating dataset with columns user item rating
+        reader = Reader(
+            line_format='user item rating', sep=',', skip_lines=1, rating_scale=(1, 5))
+
+        # Load the dataset from the CSV file
+        course_dataset = Dataset.load_from_file("data/ratings.csv", reader=reader)
+        train_set, test_set = train_test_split(course_dataset, test_size=.3)
+
+       # print(f"Total {train_set.n_users} users and {test_set.n_items} items in the trainingset")
+
+        # Create a KNN model
+        sim_option = {
+            'name': 'cosine', 'user_base': True
+        }
+
+        knn_model = KNNBasic(sim_option=sim_option)
+
+        # - Train the KNNBasic model on the trainset, and predict ratings for the testset
+        knn_model.fit(train_set)
+        predictions = knn_model.test(test_set)
+        # - Then compute RMSE
+        accuracy.rmse(predictions)
+
 
 # Prediction
 def predict(model_name, test_user_id, params):
@@ -396,6 +425,47 @@ def predict(model_name, test_user_id, params):
                 users.append(test_user_id)
                 courses.append(course)
                 scores.append(None)
+    elif model_name == models[4]: # KNN
+        # Load ratings data
+        ratings_df = load_ratings()
+
+        # Get courses rated by test user
+        user_ratings = ratings_df[ratings_df['user'] == test_user_id]
+        rated_courses = user_ratings['item'].to_list()
+
+        # Get all courses
+        all_courses = set(ratings_df['item'].unique())
+        unrated_courses = all_courses.difference(rated_courses)
+
+        # Create test data for prediction
+        test_data = []
+        for course in unrated_courses:
+            test_data.append((test_user_id, course, 3.0)) # Default rating
+
+        # Set up reader and load data
+        reader = Reader(line_format='user item rating', sep=',', skip_lines=1, rating_scale=(1, 5))
+        ratings_df.to_csv('data/ratings.csv', index=False)
+        train_data = Dataset.load_from_file('data/ratings.csv', reader=reader)
+
+        # Train KNN model
+        sim_option = {
+            'name': 'cosine', 'user_base': True
+        }
+        knn_model = KNNBasic(sim_option=sim_option)
+        knn_model.fit(train_data.build_full_trainset())
+
+        # Make predictions
+        predictions = knn_model.test(test_data)
+
+        # Filter predictions above threshold
+        score_threshold = params.get('knn_score_threshold', 2.5)
+
+        for pred in predictions:
+            # print(f'Predicted rating for user {pred.uid} and course {pred.iid} is {pred.est}')
+            if pred.est >= score_threshold:
+                users.append(test_user_id)
+                courses.append(pred.iid)
+                scores.append(pred.est)
 
 
     res_dict['USER'] = users[:params['top_courses']] if 'top_courses' in params else users
