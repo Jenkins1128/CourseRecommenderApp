@@ -5,7 +5,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 
-from surprise import KNNBasic
+from surprise import KNNBasic, NMF
 from surprise import Dataset, Reader
 from surprise.model_selection import train_test_split
 from surprise import accuracy
@@ -265,6 +265,25 @@ def train(model_name, test_user_id, params):
         predictions = knn_model.test(test_set)
         # - Then compute RMSE
         accuracy.rmse(predictions)
+    elif model_name == models[5]: # NMF
+         # Read the course rating dataset with columns user item rating
+        reader = Reader(
+            line_format='user item rating', sep=',', skip_lines=1, rating_scale=(1, 5))
+
+        # Load the dataset from the CSV file
+        course_dataset = Dataset.load_from_file("data/ratings.csv", reader=reader)
+        train_set, test_set = train_test_split(course_dataset, test_size=.3)
+
+       # print(f"Total {train_set.n_users} users and {test_set.n_items} items in the trainingset")
+        # - Define a NMF model NMF(verbose=True, random_state=123)
+        nmf = NMF(verbose=True, random_state=123)
+        # - Fit the model on the trainset
+        nmf.fit(train_set)
+        # - Train the NMF on the trainset, and predict ratings for the testset
+        predictions = nmf.test(test_set)
+        # - Then compute RMSE
+        accuracy.rmse(predictions)
+
 
 
 # Prediction
@@ -462,6 +481,44 @@ def predict(model_name, test_user_id, params):
 
         for pred in predictions:
             # print(f'Predicted rating for user {pred.uid} and course {pred.iid} is {pred.est}')
+            if pred.est >= score_threshold:
+                users.append(test_user_id)
+                courses.append(pred.iid)
+                scores.append(pred.est)
+    elif model_name == models[5]: # NMF
+        # Load ratings data
+        ratings_df = load_ratings()
+
+        # Get courses rated by test user
+        user_ratings = ratings_df[ratings_df['user'] == test_user_id]
+        rated_courses = user_ratings['item'].to_list()
+
+        # Get all courses
+        all_courses = set(ratings_df['item'].unique())
+        unrated_courses = all_courses.difference(rated_courses)
+
+        # Create test data for prediction
+        test_data = []
+        for course in unrated_courses:
+            test_data.append((test_user_id, course, 3.0))  # Default rating
+
+        # Set up reader and load data
+        reader = Reader(line_format='user item rating', sep=',', skip_lines=1, rating_scale=(1, 5))
+        ratings_df.to_csv('data/ratings.csv', index=False)
+        train_data = Dataset.load_from_file('data/ratings.csv', reader=reader)
+
+        # Train NMF model
+        nmf = NMF(verbose=True, random_state=123)
+        nmf.fit(train_data.build_full_trainset())
+
+        # Make predictions
+        predictions = nmf.test(test_data)
+
+        # Filter predictions above threshold
+        score_threshold = params.get('nmf_score_threshold', 2.5)
+        print(f"Predictions: {predictions}")
+        for pred in predictions:
+            print(f'Predicted rating for user {pred.uid} and course {pred.iid} is {pred.est}')
             if pred.est >= score_threshold:
                 users.append(test_user_id)
                 courses.append(pred.iid)

@@ -105,6 +105,11 @@ def train(model_name, test_user_id, params):
             time.sleep(0.5)
             backend.train(model_name, test_user_id, params)
         st.success('KNN Model trained successfully!')
+    elif model_name == backend.models[5]:
+        with st.spinner('Training NMF Model...'):
+            time.sleep(0.5)
+            backend.train(model_name, test_user_id, params)
+        st.success('NMF Model trained successfully!')
 
     else:
         st.warning('Training logic for this model is not implemented yet.')
@@ -191,8 +196,17 @@ elif model_selection == backend.models[4]:
                                             value=2, step=1)
     params['top_courses'] = top_courses
     params['knn_score_threshold'] = knn_score_threshold
+# NMF Model
 elif model_selection == backend.models[5]:
-    pass
+    # Add a slide bar for selecting top courses
+    top_courses = st.sidebar.slider('Top courses',
+                                    min_value=0, max_value=100,
+                                    value=10, step=1)
+    nmf_score_threshold = st.sidebar.slider('NMF Rating Mode Threshold',
+                                            min_value=0, max_value=3,
+                                            value=2, step=1)
+    params['top_courses'] = top_courses
+    params['nmf_score_threshold'] = nmf_score_threshold
 else:
     pass
 
