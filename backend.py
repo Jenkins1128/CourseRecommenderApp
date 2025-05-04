@@ -185,6 +185,58 @@ def train(model_name, test_user_id, params):
         combined_df = combine_cluster_labels(user_ids, cluster_labels)
         # Save the cluster labels to a CSV file
         combined_df.to_csv('data/user_clusters.csv', index=False)
+    elif model_name == models[3]: # Clustering with PCA
+        k = 13
+        if 'cluster_no' in params:
+            k = params['cluster_no']
+         # Load and process user ratings data
+        ratings_df = pd.read_csv('data/ratings.csv')
+        # Load course genres data
+        course_genres_df = pd.read_csv('data/course_genres.csv')
+        # Load user profiles
+        user_profiles_df = pd.read_csv('data/user_profiles.csv')
+
+        # Get test user profile
+        user_ratings = ratings_df[ratings_df['user'] == test_user_id]
+        # Calculate weighted genre scores based on ratings
+        test_user_profile_df = pd.DataFrame()
+        test_user_profile_df['user'] = [test_user_id]
+        # Calculate genre scores by multiplying ratings with course genres
+        for genre in course_genres_df.columns[2:]:
+            genre_scores = []
+            for _, row in user_ratings.iterrows():
+                course_id = row['item']
+                rating = row['rating']
+                course_genre = course_genres_df[course_genres_df['COURSE_ID'] == course_id][genre].values[0]
+                genre_scores.append(rating * course_genre)
+            test_user_profile_df[genre] = [sum(genre_scores)]
+
+        # Append the test user profile to the user profiles DataFrame
+        user_profiles_df = pd.concat([user_profiles_df, test_user_profile_df], ignore_index=True)
+
+        feature_names = list(user_profiles_df.columns[1:])
+
+        # Use StandardScaler to make each feature with mean 0, standard deviation 1
+        # Instantiating a StandardScaler object
+        scaler = StandardScaler()
+
+        # Standardizing the selected features (feature_names) in the user_profile_df DataFrame
+        user_profiles_df[feature_names] = scaler.fit_transform(user_profiles_df[feature_names])
+
+        features = user_profiles_df.loc[:, user_profiles_df.columns != 'user']
+        user_ids = user_profiles_df.loc[:, user_profiles_df.columns == 'user']
+
+        # Apply PCA
+        pca = PCA(n_components=9)
+        components = pca.fit_transform(features)
+
+        rs = 42
+        k_means_model = KMeans(n_clusters=k, random_state=rs).fit(components)
+        cluster_labels = k_means_model.labels_
+
+        combined_df = combine_cluster_labels(user_ids, cluster_labels)
+        # Save the cluster labels to a CSV file
+        combined_df.to_csv('data/user_clusters.csv', index=False)
 
 # Prediction
 def predict(model_name, test_user_id, params):
@@ -273,13 +325,9 @@ def predict(model_name, test_user_id, params):
 
         ## - For each user, first finds its cluster label
         for user_id in test_users_labelled['user'].unique():
-            if user_id == test_user_id:
-                print('present test user_id:', user_id)
             user_subset = test_users_labelled[test_users_labelled['user'] == user_id]
             ## - First get all courses belonging to the same cluster and figure out what are the popular ones (such as course enrollments beyond a threshold like 100)
             all_courses = courses_cluster_grouped[courses_cluster_grouped['cluster'] == user_subset['cluster'].iloc[0]]
-            if user_id == test_user_id:
-                print('all_courses:', all_courses)
             popular_courses = all_courses[all_courses['enrollments'] >= enrollments_threshold]['item'].values.tolist()
             popular_courses = set(popular_courses)
             ## - Get the user's current enrolled courses
@@ -302,11 +350,52 @@ def predict(model_name, test_user_id, params):
                 courses.append(course)
                 scores.append(None)
     elif model_name == models[3]: # Clustering with PCA
-        pass
+        enrollments_threshold = params.get('enrollments_threshold', 10)
+        ratings_df = load_ratings()
+        test_users_df = ratings_df[['user', 'item']]
+        # Load user clusters
+        user_clusters_df = pd.read_csv('data/user_clusters.csv')
+
+        test_users_labelled = pd.merge(test_users_df, user_clusters_df, left_on='user', right_on='user')
+
+        # Extracting the 'item' and 'cluster' columns from the test_users_labelled DataFrame
+        courses_cluster = test_users_labelled[['item', 'cluster']]
+
+        # Adding a new column 'count' with a value of 1 for each row in the courses_cluster DataFrame
+        courses_cluster['count'] = [1] * len(courses_cluster)
+
+        # Grouping the DataFrame by 'cluster' and 'item', aggregating the 'count' column with the sum function,
+        # and resetting the index to make the result more readable
+        courses_cluster_grouped = courses_cluster.groupby(['cluster','item']).agg(enrollments=('count','sum')).reset_index()
+        # Recommend unseen courses based on the popular courses in test users cluster
+        recommendations = {}
+
+        ## - For each user, first finds its cluster label
+        for user_id in test_users_labelled['user'].unique():
+            user_subset = test_users_labelled[test_users_labelled['user'] == user_id]
+            ## - First get all courses belonging to the same cluster and figure out what are the popular ones (such as course enrollments beyond a threshold like 100)
+            all_courses = courses_cluster_grouped[courses_cluster_grouped['cluster'] == user_subset['cluster'].iloc[0]]
+            popular_courses = all_courses[all_courses['enrollments'] >= enrollments_threshold]['item'].values.tolist()
+            popular_courses = set(popular_courses)
+            ## - Get the user's current enrolled courses
+            users_enrolled_courses = test_users_labelled[test_users_labelled['user'] == user_id]['item'].values.tolist()
+            users_enrolled_courses = set(users_enrolled_courses)
+            ## - Check if there are any courses on the popular course list which are new/unseen to the user.
+            unseen_courses = popular_courses.difference(users_enrolled_courses)
+            ## If yes, make those unseen and popular courses as recommendation results for the user
+            recommendations[f'{user_id}'] = list(unseen_courses)
 
 
-
-
+        if f'{test_user_id}' in recommendations:
+            print(f"Recommendations W PCA for user {test_user_id}: {recommendations[f'{test_user_id}']}")
+        else:
+            print(f"No recommendations found for user {test_user_id}.")
+        if f'{test_user_id}' in recommendations and len(recommendations[f'{test_user_id}']) > 0:
+            # Add the recommendations to the result lists
+            for course in recommendations[f'{test_user_id}']:
+                users.append(test_user_id)
+                courses.append(course)
+                scores.append(None)
 
 
     res_dict['USER'] = users[:params['top_courses']] if 'top_courses' in params else users

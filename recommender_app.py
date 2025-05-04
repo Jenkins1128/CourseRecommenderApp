@@ -95,6 +95,11 @@ def train(model_name, test_user_id, params):
             time.sleep(0.5)
             backend.train(model_name, test_user_id, params)
         st.success('Clustering Model trained successfully!')
+    elif model_name == backend.models[3]:
+        with st.spinner('Training Clustering Model with PCA...'):
+            time.sleep(0.5)
+            backend.train(model_name, test_user_id, params)
+        st.success('Clustering Model with PCA trained successfully!')
     else:
         st.warning('Training logic for this model is not implemented yet.')
 
@@ -151,6 +156,16 @@ elif model_selection == backend.models[1]:
     params['score_threshold'] = profile_score_threshold
 # Clustering model
 elif model_selection == backend.models[2]:
+    cluster_no = st.sidebar.slider('Number of Clusters',
+                                   min_value=0, max_value=50,
+                                   value=10, step=1)
+    enrollments_threshold = st.sidebar.slider('User Enrollments Threshold',
+                                              min_value=0, max_value=100,
+                                              value=10, step=2)
+    params['cluster_no'] = cluster_no
+    params['enrollments_threshold'] = enrollments_threshold
+# Clustering model with PCA
+elif model_selection == backend.models[3]:
     cluster_no = st.sidebar.slider('Number of Clusters',
                                    min_value=0, max_value=50,
                                    value=10, step=1)
