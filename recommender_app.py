@@ -110,6 +110,11 @@ def train(model_name, test_user_id, params):
             time.sleep(0.5)
             backend.train(model_name, test_user_id, params)
         st.success('NMF Model trained successfully!')
+    elif model_name == backend.models[6]: # Neural Network
+        with st.spinner('Training Neural Network Model...'):
+            time.sleep(0.5)
+            backend.train(model_name, test_user_id, params)
+        st.success('Neural Network Model trained successfully!')
 
     else:
         st.warning('Training logic for this model is not implemented yet.')
@@ -207,6 +212,16 @@ elif model_selection == backend.models[5]:
                                             value=2, step=1)
     params['top_courses'] = top_courses
     params['nmf_score_threshold'] = nmf_score_threshold
+elif model_selection == backend.models[6]:
+    # Add a slide bar for selecting top courses
+    top_courses = st.sidebar.slider('Top courses',
+                                    min_value=0, max_value=100,
+                                    value=10, step=1)
+    nn_score_threshold = st.sidebar.slider('Neural Network Rating Mode Threshold',
+                                            min_value=0.0, max_value=1.0,
+                                            value=0.01, step=.01)
+    params['top_courses'] = top_courses
+    params['nn_score_threshold'] = nn_score_threshold
 else:
     pass
 

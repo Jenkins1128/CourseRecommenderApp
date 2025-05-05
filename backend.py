@@ -10,6 +10,12 @@ from surprise import Dataset, Reader
 from surprise.model_selection import train_test_split
 from surprise import accuracy
 
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+
+from recommender_net import RecommenderNet
+
 models = ("Course Similarity",
           "User Profile",
           "Clustering",
@@ -95,7 +101,54 @@ def combine_cluster_labels(user_ids, labels):
     cluster_df.columns = ['user', 'cluster']
     return cluster_df
 
+def process_dataset(raw_data):
 
+    encoded_data = raw_data.copy()
+
+    # Mapping user ids to indices
+    user_list = encoded_data["user"].unique().tolist()
+    user_id2idx_dict = {x: i for i, x in enumerate(user_list)}
+    user_idx2id_dict = {i: x for i, x in enumerate(user_list)}
+
+    # Mapping course ids to indices
+    course_list = encoded_data["item"].unique().tolist()
+    course_id2idx_dict = {x: i for i, x in enumerate(course_list)}
+    course_idx2id_dict = {i: x for i, x in enumerate(course_list)}
+
+    # Convert original user ids to idx
+    encoded_data["user"] = encoded_data["user"].map(user_id2idx_dict)
+    # Convert original course ids to idx
+    encoded_data["item"] = encoded_data["item"].map(course_id2idx_dict)
+    # Convert rating to int
+    encoded_data["rating"] = encoded_data["rating"].values.astype("int")
+
+    return encoded_data, user_idx2id_dict, course_idx2id_dict
+
+def generate_train_test_datasets(dataset, scale=True):
+
+    min_rating = min(dataset["rating"])
+    max_rating = max(dataset["rating"])
+
+    dataset = dataset.sample(frac=1, random_state=42)
+    x = dataset[["user", "item"]].values
+    if scale:
+        y = dataset["rating"].apply(lambda x: (x - min_rating) / (max_rating - min_rating)).values
+    else:
+        y = dataset["rating"].values
+
+    # Assuming training on 80% of the data and validating on 10%, and testing 10%
+    train_indices = int(0.8 * dataset.shape[0])
+    test_indices = int(0.9 * dataset.shape[0])
+
+    x_train, x_val, x_test, y_train, y_val, y_test = (
+        x[:train_indices],
+        x[train_indices:test_indices],
+        x[test_indices:],
+        y[:train_indices],
+        y[train_indices:test_indices],
+        y[test_indices:],
+    )
+    return x_train, x_val, x_test, y_train, y_val, y_test
 
 
 
@@ -283,7 +336,43 @@ def train(model_name, test_user_id, params):
         predictions = nmf.test(test_set)
         # - Then compute RMSE
         accuracy.rmse(predictions)
+    elif model_name == models[6]: # Neural Network
+        # Load ratings data
+        ratings_df = load_ratings()
 
+        # Process dataset to get encoded data and mapping dictionaries
+        encoded_data, user_idx2id_dict, course_idx2id_dict = process_dataset(ratings_df)
+
+        # Generate train/test datasets
+        x_train, x_val, x_test, y_train, y_val, y_test = generate_train_test_datasets(encoded_data)
+
+        # Get number of users and items
+        num_users = len(encoded_data['user'].unique())
+        num_items = len(encoded_data['item'].unique())
+
+        # Create and train model
+        embedding_size = params.get('embedding_size', 16)
+        model = RecommenderNet(num_users, num_items, embedding_size)
+
+        # Compile model
+        model.compile(
+            loss=tf.keras.losses.MeanSquaredError(),
+            optimizer=keras.optimizers.Adam(),
+            metrics=[tf.keras.metrics.RootMeanSquaredError()]
+        )
+
+        # Train model
+        history = model.fit(
+            x=x_train,
+            y=y_train,
+            batch_size=64,
+            epochs=5,
+            validation_data=(x_val, y_val)
+        )
+
+        # Evaluate model
+        test_loss = model.evaluate(x_test, y_test)
+        print(f"Test RMSE: {test_loss[1]}")
 
 
 # Prediction
@@ -523,6 +612,51 @@ def predict(model_name, test_user_id, params):
                 users.append(test_user_id)
                 courses.append(pred.iid)
                 scores.append(pred.est)
+    elif model_name == models[6]: # Neural Network
+        # Load ratings data
+        ratings_df = load_ratings()
+
+        # Process dataset to get encoded data and mapping dictionaries
+        encoded_data, user_idx2id_dict, course_idx2id_dict = process_dataset(ratings_df)
+
+        # Get encoded user id
+        user_ratings = ratings_df[ratings_df['user'] == test_user_id]
+        rated_courses = user_ratings['item'].to_list()
+
+        # Get all courses and find unrated ones
+        all_courses = set(ratings_df['item'].unique())
+        unrated_courses = all_courses.difference(rated_courses)
+
+        # Get number of users and items
+        num_users = len(encoded_data['user'].unique())
+        num_items = len(encoded_data['item'].unique())
+
+        # Create model with same architecture used in training
+        model = RecommenderNet(num_users, num_items)
+
+        # Create test data for unrated courses
+        test_data = []
+        encoded_user = list(user_idx2id_dict.keys())[list(user_idx2id_dict.values()).index(test_user_id)]
+
+        for course in unrated_courses:
+            encoded_course = list(course_idx2id_dict.keys())[list(course_idx2id_dict.values()).index(course)]
+            test_data.append([encoded_user, encoded_course])
+
+        test_data = np.array(test_data)
+        print(f'test_data: {test_data}')
+        # Make predictions
+        predictions = model.predict(test_data)
+
+        # Filter predictions above threshold
+        score_threshold = params.get('nn_score_threshold', 0.01)
+
+        for i, pred in enumerate(predictions):
+            course = list(course_idx2id_dict.values())[list(course_idx2id_dict.keys()).index(test_data[i][1])]
+            print(f'Predicted rating for user {test_user_id} and course {course} is {float(pred)}')
+            if pred >= score_threshold:
+                users.append(test_user_id)
+                courses.append(course)
+                scores.append(float(pred))
 
 
     res_dict['USER'] = users[:params['top_courses']] if 'top_courses' in params else users
