@@ -12,7 +12,6 @@ from surprise import accuracy
 
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
 
 from recommender_net import RecommenderNet
 
@@ -22,9 +21,7 @@ models = ("Course Similarity",
           "Clustering with PCA",
           "KNN",
           "NMF",
-          "Neural Network",
-          "Regression with Embedding Features",
-          "Classification with Embedding Features")
+          "Neural Network")
 
 
 def load_ratings():
@@ -150,28 +147,23 @@ def generate_train_test_datasets(dataset, scale=True):
     )
     return x_train, x_val, x_test, y_train, y_val, y_test
 
-
-
 # Model training
 def train(model_name, test_user_id, params):
-    # TODO: Add model training code here
-    print('params:', params)
-
     if model_name == models[0]: #Course Similarity
-            # Load the Bag of Words (BoW) dataset
-            bow_df = load_bow()
+        # Load the Bag of Words (BoW) dataset
+        bow_df = load_bow()
 
-            # Create a similarity matrix
-            bow_matrix_np = bow_df.pivot(index='doc_index', columns='token', values='bow').fillna(0).to_numpy()
-            sim_matrix = cosine_similarity(bow_matrix_np)
+        # Create a similarity matrix
+        bow_matrix_np = bow_df.pivot(index='doc_index', columns='token', values='bow').fillna(0).to_numpy()
+        sim_matrix = cosine_similarity(bow_matrix_np)
 
-            # Apply similarity threshold
-            sim_threshold = params.get('sim_threshold', 50) / 100.0  # Default to 50% if not provided
-            sim_matrix[sim_matrix < sim_threshold] = 0
+        # Apply similarity threshold
+        sim_threshold = params.get('sim_threshold', 50) / 100.0  # Default to 50% if not provided
+        sim_matrix[sim_matrix < sim_threshold] = 0
 
-            # Save the filtered similarity matrix
-            filtered_sim_df = pd.DataFrame(sim_matrix)
-            filtered_sim_df.to_csv("data/sim.csv", index=False)
+        # Save the filtered similarity matrix
+        filtered_sim_df = pd.DataFrame(sim_matrix)
+        filtered_sim_df.to_csv("data/sim.csv", index=False)
     elif model_name == models[1]: # User Profile
          # Load and process user ratings data
         ratings_df = pd.read_csv('data/ratings.csv')
@@ -304,8 +296,6 @@ def train(model_name, test_user_id, params):
         course_dataset = Dataset.load_from_file("data/ratings.csv", reader=reader)
         train_set, test_set = train_test_split(course_dataset, test_size=.3)
 
-       # print(f"Total {train_set.n_users} users and {test_set.n_items} items in the trainingset")
-
         # Create a KNN model
         sim_option = {
             'name': 'cosine', 'user_base': True
@@ -327,7 +317,6 @@ def train(model_name, test_user_id, params):
         course_dataset = Dataset.load_from_file("data/ratings.csv", reader=reader)
         train_set, test_set = train_test_split(course_dataset, test_size=.3)
 
-       # print(f"Total {train_set.n_users} users and {test_set.n_items} items in the trainingset")
         # - Define a NMF model NMF(verbose=True, random_state=123)
         nmf = NMF(verbose=True, random_state=123)
         # - Fit the model on the trainset
@@ -371,18 +360,10 @@ def train(model_name, test_user_id, params):
         )
 
         # Evaluate model
-        test_loss = model.evaluate(x_test, y_test)
-        print(f"Test RMSE: {test_loss[1]}")
-
+        model.evaluate(x_test, y_test)
 
 # Prediction
 def predict(model_name, test_user_id, params):
-    sim_threshold = 0.6
-    score_threshold = 2
-    if "sim_threshold" in params:
-        sim_threshold = params["sim_threshold"] / 100.0
-    if 'score_threshold' in params:
-        score_threshold = params['score_threshold']
     idx_id_dict, id_idx_dict = get_doc_dicts()
     sim_matrix = load_course_sims().to_numpy()
     users = []
@@ -392,6 +373,7 @@ def predict(model_name, test_user_id, params):
 
     # Course Similarity model
     if model_name == models[0]:
+        sim_threshold = params.get('sim_threshold', 50) / 100.0
         ratings_df = load_ratings()
         user_ratings = ratings_df[ratings_df['user'] == test_user_id]
         enrolled_course_ids = user_ratings['item'].to_list()
@@ -403,6 +385,7 @@ def predict(model_name, test_user_id, params):
                 scores.append(score)
     # User Profile model prediction
     elif model_name == models[1]:
+        score_threshold = params.get('profile_score_threshold', 2)
         # Load necessary data
         ratings_df = load_ratings()
         course_genres_df = pd.read_csv('data/course_genres.csv')
@@ -410,36 +393,34 @@ def predict(model_name, test_user_id, params):
 
         # Get user profile
         user_profile = profile_df[profile_df['user'] == test_user_id]
-        if not user_profile.empty:
-            # Get user vector (excluding user ID column)
-            user_vector = user_profile.iloc[0, 1:].values
+        # Get user vector (excluding user ID column)
+        user_vector = user_profile.iloc[0, 1:].values
 
-            # Get enrolled courses for the user
-            user_ratings = ratings_df[ratings_df['user'] == test_user_id]
-            enrolled_courses = user_ratings['item'].to_list()
+        # Get enrolled courses for the user
+        user_ratings = ratings_df[ratings_df['user'] == test_user_id]
+        enrolled_courses = user_ratings['item'].to_list()
 
-            # Get all courses and find unknown courses
-            all_courses = set(course_genres_df['COURSE_ID'].values)
-            unknown_courses = all_courses.difference(enrolled_courses)
+        # Get all courses and find unknown courses
+        all_courses = set(course_genres_df['COURSE_ID'].values)
+        unknown_courses = all_courses.difference(enrolled_courses)
 
-            # Filter course genres for unknown courses
-            unknown_course_genres = course_genres_df[course_genres_df['COURSE_ID'].isin(unknown_courses)]
-            unknown_course_ids = unknown_course_genres['COURSE_ID'].values
+        # Filter course genres for unknown courses
+        unknown_course_genres = course_genres_df[course_genres_df['COURSE_ID'].isin(unknown_courses)]
+        unknown_course_ids = unknown_course_genres['COURSE_ID'].values
 
-            # Calculate recommendation scores using dot product
-            recommendation_scores = np.dot(unknown_course_genres.iloc[:, 2:].values, user_vector)
+        # Calculate recommendation scores using dot product
+        recommendation_scores = np.dot(unknown_course_genres.iloc[:, 2:].values, user_vector)
 
-            # Add recommendations above threshold
-            for i in range(len(unknown_course_ids)):
-                score = recommendation_scores[i]
-                print(f'score: {score}, score: {score_threshold}')
-                if score >= score_threshold:
-                    users.append(test_user_id)
-                    courses.append(unknown_course_ids[i])
-                    scores.append(score)
-        else:
-            print(f'User {test_user_id} has no profile data.')
-    elif model_name == models[2]: # Clustering
+        # Add recommendations above threshold
+        for i in range(len(unknown_course_ids)):
+            score = recommendation_scores[i]
+            print(f"Course: {unknown_course_ids[i]}, Score: {score}, Score Threshold: {score_threshold}")
+            if score >= score_threshold:
+                users.append(test_user_id)
+                courses.append(unknown_course_ids[i])
+                scores.append(score)
+    # Clustering model
+    elif model_name == models[2]:
         enrollments_threshold = params.get('enrollments_threshold', 10)
         ratings_df = load_ratings()
         test_users_df = ratings_df[['user', 'item']]
@@ -475,18 +456,14 @@ def predict(model_name, test_user_id, params):
             ## If yes, make those unseen and popular courses as recommendation results for the user
             recommendations[f'{user_id}'] = list(unseen_courses)
 
-
-        if f'{test_user_id}' in recommendations:
-            print(f"Recommendations for user {test_user_id}: {recommendations[f'{test_user_id}']}")
-        else:
-            print(f"No recommendations found for user {test_user_id}.")
         if f'{test_user_id}' in recommendations and len(recommendations[f'{test_user_id}']) > 0:
             # Add the recommendations to the result lists
             for course in recommendations[f'{test_user_id}']:
                 users.append(test_user_id)
                 courses.append(course)
                 scores.append(None)
-    elif model_name == models[3]: # Clustering with PCA
+    # Clustering model with PCA
+    elif model_name == models[3]:
         enrollments_threshold = params.get('enrollments_threshold', 10)
         ratings_df = load_ratings()
         test_users_df = ratings_df[['user', 'item']]
@@ -522,18 +499,14 @@ def predict(model_name, test_user_id, params):
             ## If yes, make those unseen and popular courses as recommendation results for the user
             recommendations[f'{user_id}'] = list(unseen_courses)
 
-
-        if f'{test_user_id}' in recommendations:
-            print(f"Recommendations W PCA for user {test_user_id}: {recommendations[f'{test_user_id}']}")
-        else:
-            print(f"No recommendations found for user {test_user_id}.")
         if f'{test_user_id}' in recommendations and len(recommendations[f'{test_user_id}']) > 0:
             # Add the recommendations to the result lists
             for course in recommendations[f'{test_user_id}']:
                 users.append(test_user_id)
                 courses.append(course)
                 scores.append(None)
-    elif model_name == models[4]: # KNN
+    # KNN model
+    elif model_name == models[4]:
         # Load ratings data
         ratings_df = load_ratings()
 
@@ -569,12 +542,12 @@ def predict(model_name, test_user_id, params):
         score_threshold = params.get('knn_score_threshold', 2.5)
 
         for pred in predictions:
-            # print(f'Predicted rating for user {pred.uid} and course {pred.iid} is {pred.est}')
             if pred.est >= score_threshold:
                 users.append(test_user_id)
                 courses.append(pred.iid)
                 scores.append(pred.est)
-    elif model_name == models[5]: # NMF
+    # NMF model
+    elif model_name == models[5]:
         # Load ratings data
         ratings_df = load_ratings()
 
@@ -605,14 +578,14 @@ def predict(model_name, test_user_id, params):
 
         # Filter predictions above threshold
         score_threshold = params.get('nmf_score_threshold', 2.5)
-        print(f"Predictions: {predictions}")
+
         for pred in predictions:
-            print(f'Predicted rating for user {pred.uid} and course {pred.iid} is {pred.est}')
             if pred.est >= score_threshold:
                 users.append(test_user_id)
                 courses.append(pred.iid)
                 scores.append(pred.est)
-    elif model_name == models[6]: # Neural Network
+    # Neural Network model
+    elif model_name == models[6]:
         # Load ratings data
         ratings_df = load_ratings()
 
@@ -643,7 +616,7 @@ def predict(model_name, test_user_id, params):
             test_data.append([encoded_user, encoded_course])
 
         test_data = np.array(test_data)
-        print(f'test_data: {test_data}')
+
         # Make predictions
         predictions = model.predict(test_data)
 
@@ -652,15 +625,15 @@ def predict(model_name, test_user_id, params):
 
         for i, pred in enumerate(predictions):
             course = list(course_idx2id_dict.values())[list(course_idx2id_dict.keys()).index(test_data[i][1])]
-            print(f'Predicted rating for user {test_user_id} and course {course} is {float(pred)}')
+
             if pred >= score_threshold:
                 users.append(test_user_id)
                 courses.append(course)
                 scores.append(float(pred))
 
-
-    res_dict['USER'] = users[:params['top_courses']] if 'top_courses' in params else users
-    res_dict['COURSE_ID'] = courses[:params['top_courses']] if 'top_courses' in params else courses
-    res_dict['SCORE'] = scores[:params['top_courses']] if 'top_courses' in params else scores
+    top_courses = params.get('top_courses', 10)
+    res_dict['USER'] = users[:top_courses]
+    res_dict['COURSE_ID'] = courses[:top_courses]
+    res_dict['SCORE'] = scores[:top_courses]
     res_df = pd.DataFrame(res_dict, columns=['USER', 'COURSE_ID', 'SCORE'])
     return res_df

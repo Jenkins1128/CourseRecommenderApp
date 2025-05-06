@@ -17,22 +17,22 @@ st.set_page_config(
 
 # ------- Functions ------
 # Load datasets
-@st.cache
+@st.cache_data
 def load_ratings():
     return backend.load_ratings()
 
 
-@st.cache
+@st.cache_data
 def load_course_sims():
     return backend.load_course_sims()
 
 
-@st.cache
+@st.cache_data
 def load_courses():
     return backend.load_courses()
 
 
-@st.cache
+@st.cache_data
 def load_bow():
     return backend.load_bow()
 
@@ -158,18 +158,17 @@ if model_selection == backend.models[0]:
                                              value=50, step=10)
     params['top_courses'] = top_courses
     params['sim_threshold'] = course_sim_threshold
-# TODO: Add hyper-parameters for other models
 # User profile model
 elif model_selection == backend.models[1]:
     # Add a slide bar for selecting top courses
     top_courses = st.sidebar.slider('Top courses',
                                     min_value=0, max_value=100,
                                     value=10, step=1)
-    profile_score_threshold = st.sidebar.slider('User Profile Similarity Threshold %',
-                                              min_value=0, max_value=100,
-                                              value=50, step=2)
+    profile_score_threshold = st.sidebar.slider('User Profile Score Threshold',
+                                              min_value=0, max_value=15,
+                                              value=2, step=1)
     params['top_courses'] = top_courses
-    params['score_threshold'] = profile_score_threshold
+    params['profile_score_threshold'] = profile_score_threshold
 # Clustering model
 elif model_selection == backend.models[2]:
     cluster_no = st.sidebar.slider('Number of Clusters',
