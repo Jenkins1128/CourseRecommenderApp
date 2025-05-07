@@ -69,6 +69,7 @@ def init__recommender_app():
         fit_columns_on_grid_load=False,
     )
 
+
     results = pd.DataFrame(response["selected_rows"], columns=['COURSE_ID', 'TITLE', 'DESCRIPTION'])
     results = results[['COURSE_ID', 'TITLE']]
     st.subheader("Your courses: ")
@@ -84,7 +85,6 @@ def train(model_name, test_user_id, params):
             time.sleep(0.5)
             backend.train(model_name, test_user_id, params)
         st.success('Course Similarity Model trained successfully!')
-    # TODO: Add other model training code here
     elif model_name == backend.models[1]:
         with st.spinner('Training User Profile Model...'):
             time.sleep(0.5)
@@ -245,5 +245,5 @@ if pred_button and selected_courses_df.shape[0] > 0:
     res_df = predict(model_selection, test_user_id, params)
     res_df = res_df[['COURSE_ID', 'SCORE']]
     course_df = load_courses()
-    res_df = pd.merge(res_df, course_df, on=["COURSE_ID"]).drop('COURSE_ID', axis=1)
+    res_df = pd.merge(res_df, course_df, on=["COURSE_ID"]).drop(['COURSE_ID', 'DESCRIPTION'], axis=1)
     st.table(res_df)

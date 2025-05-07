@@ -188,9 +188,7 @@ def train(model_name, test_user_id, params):
         # Save user profiles
         test_user_profile_df.to_csv('data/test_user_profile.csv', index=False)
     elif model_name == models[2]: # Clustering
-        k = 13
-        if 'cluster_no' in params:
-            k = params['cluster_no']
+        k = params.get('cluster_no', 13)
          # Load and process user ratings data
         ratings_df = pd.read_csv('data/ratings.csv')
         # Load course genres data
@@ -236,10 +234,8 @@ def train(model_name, test_user_id, params):
         # Save the cluster labels to a CSV file
         combined_df.to_csv('data/user_clusters.csv', index=False)
     elif model_name == models[3]: # Clustering with PCA
-        k = 13
-        if 'cluster_no' in params:
-            k = params['cluster_no']
-         # Load and process user ratings data
+        k = params.get('cluster_no', 13)
+        # Load and process user ratings data
         ratings_df = pd.read_csv('data/ratings.csv')
         # Load course genres data
         course_genres_df = pd.read_csv('data/course_genres.csv')
@@ -303,7 +299,7 @@ def train(model_name, test_user_id, params):
 
         knn_model = KNNBasic(sim_option=sim_option)
 
-        # - Train the KNNBasic model on the trainset, and predict ratings for the testset
+        # - Train the KNNBasic model on the train_set, and predict ratings for the test_set
         knn_model.fit(train_set)
         predictions = knn_model.test(test_set)
         # - Then compute RMSE
@@ -317,11 +313,12 @@ def train(model_name, test_user_id, params):
         course_dataset = Dataset.load_from_file("data/ratings.csv", reader=reader)
         train_set, test_set = train_test_split(course_dataset, test_size=.3)
 
-        # - Define a NMF model NMF(verbose=True, random_state=123)
-        nmf = NMF(verbose=True, random_state=123)
-        # - Fit the model on the trainset
+        # - Define a NMF model
+        rs = 42
+        nmf = NMF(verbose=True, random_state=rs)
+        # - Fit the model on the train_set
         nmf.fit(train_set)
-        # - Train the NMF on the trainset, and predict ratings for the testset
+        # - Train the NMF on the train_set, and predict ratings for the test_set
         predictions = nmf.test(test_set)
         # - Then compute RMSE
         accuracy.rmse(predictions)
