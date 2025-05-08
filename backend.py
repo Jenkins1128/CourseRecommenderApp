@@ -99,7 +99,6 @@ def combine_cluster_labels(user_ids, labels):
     return cluster_df
 
 def process_dataset(raw_data):
-
     encoded_data = raw_data.copy()
 
     # Mapping user ids to indices
@@ -119,10 +118,9 @@ def process_dataset(raw_data):
     # Convert rating to int
     encoded_data["rating"] = encoded_data["rating"].values.astype("int")
 
-    return encoded_data, user_idx2id_dict, course_idx2id_dict
+    return encoded_data, user_idx2id_dict, user_id2idx_dict, course_idx2id_dict, course_id2idx_dict
 
 def generate_train_test_datasets(dataset, scale=True):
-
     min_rating = min(dataset["rating"])
     max_rating = max(dataset["rating"])
 
@@ -327,7 +325,7 @@ def train(model_name, test_user_id, params):
         ratings_df = load_ratings()
 
         # Process dataset to get encoded data and mapping dictionaries
-        encoded_data, user_idx2id_dict, course_idx2id_dict = process_dataset(ratings_df)
+        encoded_data, _ , _ , _ , _ = process_dataset(ratings_df)
 
         # Generate train/test datasets
         x_train, x_val, x_test, y_train, y_val, y_test = generate_train_test_datasets(encoded_data)
@@ -337,8 +335,7 @@ def train(model_name, test_user_id, params):
         num_items = len(encoded_data['item'].unique())
 
         # Create and train model
-        embedding_size = params.get('embedding_size', 16)
-        model = RecommenderNet(num_users, num_items, embedding_size)
+        model = RecommenderNet(num_users, num_items)
 
         # Compile model
         model.compile(
@@ -348,7 +345,7 @@ def train(model_name, test_user_id, params):
         )
 
         # Train model
-        history = model.fit(
+        model.fit(
             x=x_train,
             y=y_train,
             batch_size=64,
@@ -411,7 +408,6 @@ def predict(model_name, test_user_id, params):
         # Add recommendations above threshold
         for i in range(len(unknown_course_ids)):
             score = recommendation_scores[i]
-            print(f"Course: {unknown_course_ids[i]}, Score: {score}, Score Threshold: {score_threshold}")
             if score >= score_threshold:
                 users.append(test_user_id)
                 courses.append(unknown_course_ids[i])
@@ -587,7 +583,7 @@ def predict(model_name, test_user_id, params):
         ratings_df = load_ratings()
 
         # Process dataset to get encoded data and mapping dictionaries
-        encoded_data, user_idx2id_dict, course_idx2id_dict = process_dataset(ratings_df)
+        encoded_data, user_idx2id_dict, user_id2idx_dict, course_idx2id_dict, course_id2idx_dict = process_dataset(ratings_df)
 
         # Get encoded user id
         user_ratings = ratings_df[ratings_df['user'] == test_user_id]
@@ -597,6 +593,9 @@ def predict(model_name, test_user_id, params):
         all_courses = set(ratings_df['item'].unique())
         unrated_courses = all_courses.difference(rated_courses)
 
+        # Generate train/test datasets
+        x_train, x_val, _, y_train, y_val, _ = generate_train_test_datasets(encoded_data)
+
         # Get number of users and items
         num_users = len(encoded_data['user'].unique())
         num_items = len(encoded_data['item'].unique())
@@ -604,12 +603,29 @@ def predict(model_name, test_user_id, params):
         # Create model with same architecture used in training
         model = RecommenderNet(num_users, num_items)
 
+        # Compile model
+        model.compile(
+            loss=tf.keras.losses.MeanSquaredError(),
+            optimizer=keras.optimizers.Adam(),
+            metrics=[tf.keras.metrics.RootMeanSquaredError()]
+        )
+
+        # Train model
+        model.fit(
+            x=x_train,
+            y=y_train,
+            batch_size=64,
+            epochs=5,
+            validation_data=(x_val, y_val)
+        )
+
         # Create test data for unrated courses
         test_data = []
-        encoded_user = list(user_idx2id_dict.keys())[list(user_idx2id_dict.values()).index(test_user_id)]
+
+        encoded_user = user_id2idx_dict[test_user_id]
 
         for course in unrated_courses:
-            encoded_course = list(course_idx2id_dict.keys())[list(course_idx2id_dict.values()).index(course)]
+            encoded_course = course_id2idx_dict[course]
             test_data.append([encoded_user, encoded_course])
 
         test_data = np.array(test_data)
@@ -621,16 +637,20 @@ def predict(model_name, test_user_id, params):
         score_threshold = params.get('nn_score_threshold', 0.01)
 
         for i, pred in enumerate(predictions):
-            course = list(course_idx2id_dict.values())[list(course_idx2id_dict.keys()).index(test_data[i][1])]
-
+            course = course_idx2id_dict[test_data[i][1]]
             if pred >= score_threshold:
                 users.append(test_user_id)
                 courses.append(course)
-                scores.append(float(pred))
+                scores.append(round(float(pred), 4))
 
     top_courses = params.get('top_courses', 10)
-    res_dict['USER'] = users[:top_courses]
-    res_dict['COURSE_ID'] = courses[:top_courses]
-    res_dict['SCORE'] = scores[:top_courses]
+    if len(users) == 0:
+        return pd.DataFrame(columns=['USER', 'COURSE_ID', 'SCORE'])
+    recommendations = list(zip(scores, users, courses))
+    recommendations.sort()
+    sorted_scores, sorted_users, sorted_courses = zip(*recommendations[-top_courses:])
+    res_dict['USER'] = list(sorted_users)[::-1]
+    res_dict['COURSE_ID'] = list(sorted_courses)[::-1]
+    res_dict['SCORE'] = list(sorted_scores)[::-1]
     res_df = pd.DataFrame(res_dict, columns=['USER', 'COURSE_ID', 'SCORE'])
     return res_df

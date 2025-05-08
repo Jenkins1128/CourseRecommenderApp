@@ -216,7 +216,7 @@ elif model_selection == backend.models[6]:
     top_courses = st.sidebar.slider('Top courses',
                                     min_value=0, max_value=100,
                                     value=10, step=1)
-    nn_score_threshold = st.sidebar.slider('Neural Network Rating Mode Threshold',
+    nn_score_threshold = st.sidebar.slider('Neural Network Score Threshold',
                                             min_value=0.0, max_value=1.0,
                                             value=0.01, step=.01)
     params['top_courses'] = top_courses
@@ -245,5 +245,5 @@ if pred_button and selected_courses_df.shape[0] > 0:
     res_df = predict(model_selection, test_user_id, params)
     res_df = res_df[['COURSE_ID', 'SCORE']]
     course_df = load_courses()
-    res_df = pd.merge(res_df, course_df, on=["COURSE_ID"]).drop(['COURSE_ID', 'DESCRIPTION'], axis=1)
+    res_df = pd.merge(res_df, course_df, on=["COURSE_ID"]).drop(['COURSE_ID', 'DESCRIPTION', 'SCORE'], axis=1) if res_df['SCORE'].isnull().all() else pd.merge(res_df, course_df, on=["COURSE_ID"]).drop(['COURSE_ID', 'DESCRIPTION'], axis=1)
     st.table(res_df)
