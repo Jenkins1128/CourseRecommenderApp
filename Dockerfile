@@ -1,8 +1,14 @@
 # Use a slim Python base image to reduce size
-FROM python:3.11-slim
+FROM python:3.9.6-slim
 
 # Set working directory
 WORKDIR /cr-app
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    python-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage caching
 COPY requirements.txt .
