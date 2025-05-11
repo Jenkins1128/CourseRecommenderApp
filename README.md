@@ -15,7 +15,8 @@ A machine learning-powered web app built with Streamlit to recommend educational
 - **Neural Network**: Predicts course relevance with a TensorFlow model.
 
 ## Screenshots
-
+![Homepage](homepage.png)
+![Neural Network Model](neural_network_model.png)
 
 ## Setup Instructions
 To run locally:
@@ -36,11 +37,13 @@ To run locally:
 
 ## Requirements
 Key dependencies (see `requirements.txt`):
-- `streamlit==1.35.0`
-- `pandas==2.2.2`
+- `pandas==1.5.3`
 - `numpy==1.26.4`
-- `tensorflow-cpu==2.15.0`
+- `tensorflow==2.19.0`
 - `scikit-learn==1.4.2`
+- `scikit-surprise==1.1.4`
+- `streamlit==1.44.1`
+- `streamlit-aggrid==0.2.2-2`
 
 ## Technical Notes
 - Optimized for local execution due to memory-intensive models (requires ~8 GB RAM).
@@ -52,4 +55,4 @@ Key dependencies (see `requirements.txt`):
 MIT License
 
 ## Contact
-[Isaiah Jenkins] – [linkedin.com/in/isaiah-jenkins]
+[Isaiah Jenkins] – [LinkedIn](linkedin.com/in/isaiah-jenkins)
