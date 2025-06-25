@@ -5,6 +5,9 @@ A machine learning-powered web app built with Streamlit to recommend educational
 ## Video Demo
 [Video Demo of app here!](https://www.dropbox.com/scl/fi/39yjvo7q2u56pabkuc6tj/courserecommenderapp.mp4?rlkey=5eklk4331rvf7iyz1zay37jhe&st=k5rx6cq8&dl=0)
 
+## Capstone Slide Presentation
+[Capstone Slide Presentation here!](https://github.com/Jenkins1128/CourseRecommenderApp/blob/main/Capstone%20Presentation.pdf)
+
 ## Features
 - **Course Similarity Utilizing Course Similarity Matrix**: Recommends courses using cosine similarity on bag of word document matrix.
 - **User Profile**: Builds personalized profiles from user interests and course history.
