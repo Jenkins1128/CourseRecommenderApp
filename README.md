@@ -1,5 +1,7 @@
 # Streamlit Course Recommendation App
 
+Isaiah Jenkins
+
 A machine learning-powered web app built with Streamlit to recommend educational courses based on user preferences and course content. This app showcases my expertise in Python, Streamlit, and data science through seven specialized models.
 
 ## Video Demo
@@ -53,9 +55,3 @@ Key dependencies (see `requirements.txt`):
 - Used `@st.cache_resource` to manage resources.
 - Free and basic cloud platforms were insufficient for RAM needed, so I provide a video and local setup instructions.
 - Models are cached for performance; datasets are accessed via URLs to keep the repo lightweight.
-
-## License
-MIT License
-
-## Contact
-[Isaiah Jenkins] – [LinkedIn](linkedin.com/in/isaiah-jenkins)
